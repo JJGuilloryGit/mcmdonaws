@@ -140,13 +140,13 @@ pipeline {
 
      post {
         always {
-            cleanWs()
             sh """
             rm -rf .terraform
             rm -f terraform.tfstate
             rm -f terraform.tfstate.backup
             rm -f .terraform.lock.hcl
         """
+            cleanWs()
         }
         failure {
             script {
