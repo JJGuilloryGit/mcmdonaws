@@ -7,8 +7,6 @@ pipeline {
         IMAGE_TAG = "latest"
         MLFLOW_TRACKING_URI = "http://${MLFLOW_SERVER_IP}:5000"
         TF_IN_AUTOMATION = "true"
-        PATH = "/usr/local/bin:$PATH"
-        PYTHONPATH = "/usr/local/lib/python3.8/site-packages:$PYTHONPATH"
     }
 
     stages {
@@ -20,11 +18,22 @@ pipeline {
             }
         }
 
-        stage('Setup Python Environment') {
+        stage('Install Python Dependencies') {
             steps {
                 sh """
+                    apt-get update
+                    apt-get install -y python3-pip
                     python3 -m pip install --upgrade pip
                     python3 -m pip install --no-cache-dir mlflow pandas numpy scikit-learn
+                """
+            }
+        }
+
+        stage('Clean Workspace') {
+            steps {
+                sh """
+                    rm -rf .terraform
+                    rm -f .terraform.lock.hcl
                 """
             }
         }
@@ -32,7 +41,6 @@ pipeline {
         stage('Initialize Terraform') {
             steps {
                 sh """
-                    rm -rf .terraform
                     terraform init -upgrade
                 """
             }
@@ -67,7 +75,6 @@ pipeline {
         stage('Train Model & Log to MLflow') {
             steps {
                 sh """
-                    export PYTHONPATH=/usr/local/lib/python3.8/site-packages:$PYTHONPATH
                     python3 train.py
                 """
             }
@@ -138,31 +145,15 @@ pipeline {
         }
     }
 
-     post {
+    post {
         always {
             sh """
-            rm -rf .terraform
-            rm -f terraform.tfstate
-            rm -f terraform.tfstate.backup
-            rm -f .terraform.lock.hcl
-        """
+                rm -rf .terraform
+                rm -f .terraform.lock.hcl
+                rm -f terraform.tfstate
+                rm -f terraform.tfstate.backup
+            """
             cleanWs()
-        }
-        failure {
-            script {
-                if (fileExists('tfplan')) {
-                    sh "rm tfplan"
-                }
-                sh "rm -rf .terraform"
-            }
-        }
-        success {
-            script {
-                if (fileExists('tfplan')) {
-                    sh "rm tfplan"
-                }
-                sh "rm -rf .terraform"
-            }
         }
     }
 }
